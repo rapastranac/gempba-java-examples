@@ -1,0 +1,3 @@
+# Force LF on shell scripts — bash interprets CR as part of the previous token,
+# so a CRLF-encoded run.sh fails on Linux/macOS with cryptic shebang errors.
+*.sh text eol=lf
