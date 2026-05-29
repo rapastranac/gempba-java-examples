@@ -9,15 +9,41 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <modules>
-        <module>commons</module>
+        <module>multiprocessing</module>
+        <module>mutithreading</module>
         <module>sequential</module>
+        <module>commons</module>
     </modules>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!--
+            GitHub owner that publishes the io.gempba:gempba artifact.  Defaults
+            to the canonical upstream so a fresh clone resolves against it.  Point
+            at a different owner (fork, org mirror) without touching this pom:
+
+              mvn install -Dgempba.github.owner=<owner>
+
+            Or set it once in a profile in ~/.m2/settings.xml.
+        -->
+        <gempba.github.owner>rapastranac</gempba.github.owner>
     </properties>
+
+    <repositories>
+        <repository>
+            <id>github-gempba</id>
+            <name>GitHub Packages — ${gempba.github.owner}/gempba</name>
+            <url>https://maven.pkg.github.com/${gempba.github.owner}/gempba</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
 
     <dependencies>
         <dependency>
