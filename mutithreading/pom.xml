@@ -25,7 +25,7 @@
         <dependency>
             <groupId>io.gempba</groupId>
             <artifactId>gempba</artifactId>
-            <version>4.1.2</version>
+            <version>${gempba.version}</version>
             <classifier>mt</classifier>
         </dependency>
 
