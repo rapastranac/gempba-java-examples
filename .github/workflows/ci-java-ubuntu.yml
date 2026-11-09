@@ -1,0 +1,104 @@
+name: Java CI (Ubuntu 24.04)
+
+on:
+  push:
+    branches: [ "main" ]
+  # Docs-only PRs start no CI.
+  pull_request:
+    paths:
+      - '**'
+      - '!**/*.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-against-installed-gempba:
+    runs-on: ${{ fromJSON(vars.RUNNER_LINUX || '["ubuntu-24.04"]') }}
+    timeout-minutes: 30
+    env:
+      GEMPBA_OWNER: ${{ vars.GEMPBA_OWNER || github.repository_owner }}
+      GEMPBA_CROSS_REPO_TOKEN: ${{ secrets.GEMPBA_CROSS_REPO_TOKEN || '' }}
+
+    steps:
+      # 1️⃣ Checkout this repo
+      - name: Checkout gempba-java-examples
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      # 2️⃣ JDK 25 + ~/.m2 cache. Maven packages the gempba JARs on the runner;
+      #    the native library builds in gempba's bindings/jni/Dockerfile
+      #    container, which holds its own toolchain, MPI included.
+      - name: Setup JDK 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Echo versions
+        run: |
+          echo "docker: $(docker version --format '{{.Server.Version}}')"
+          echo "java: $(java -version 2>&1 | head -1)"
+          echo "mvn: $(mvn -v | head -1)"
+
+      # 3️⃣ Resolve sister-repo branch (same-name, fall back to main)
+      - name: Resolve gempba ref
+        id: gempba_ref
+        run: |
+          # Override any extraheader/credential helper set by actions/checkout
+          # (v6 writes the GITHUB_TOKEN auth header to a separate config file
+          # that --local --unset-all cannot reach, so the URL-embedded PAT was
+          # being shadowed). -c clears them for THIS command only.
+          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
+            GEMPBA_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_OWNER}/gempba.git"
+          else
+            GEMPBA_URL="https://github.com/${GEMPBA_OWNER}/gempba.git"
+          fi
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          set +e
+          LS_OUTPUT=$(git -c http."https://github.com/".extraheader= -c credential.helper= ls-remote --exit-code --heads "$GEMPBA_URL" "$BRANCH" 2>&1)
+          LS_EXIT=$?
+          set -e
+          if [ "$LS_EXIT" = "0" ]; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+            echo "Picked sister branch '$BRANCH' from $GEMPBA_OWNER/gempba"
+          elif [ "$LS_EXIT" = "2" ]; then
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+            echo "Sister branch '$BRANCH' not present in $GEMPBA_OWNER/gempba; falling back to main"
+          else
+            echo "::error::ls-remote against $GEMPBA_OWNER/gempba failed (exit $LS_EXIT)"
+            echo "$LS_OUTPUT"
+            exit "$LS_EXIT"
+          fi
+
+      # 4️⃣ Clone gempba and record the JAR version its bindings/java/pom.xml builds
+      - name: Clone gempba
+        run: |
+          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
+            GEMPBA_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_OWNER}/gempba.git"
+          else
+            GEMPBA_URL="https://github.com/${GEMPBA_OWNER}/gempba.git"
+          fi
+          git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.gempba_ref.outputs.ref }}" \
+            "$GEMPBA_URL" "$RUNNER_TEMP/gempba-src"
+          GEMPBA_VERSION=$(grep -m1 '<version>' "$RUNNER_TEMP/gempba-src/bindings/java/pom.xml" | sed -E 's/[[:space:]]*<version>([^<]+)<\/version>.*/\1/')
+          echo "GEMPBA_VERSION=$GEMPBA_VERSION" >> "$GITHUB_ENV"
+          echo "gempba JAR version: $GEMPBA_VERSION"
+
+      # 5️⃣ Build the MT and MP gempba JARs and mvn install them into ~/.m2,
+      #    where this repo's io.gempba:gempba dependency resolves them.
+      - name: Install gempba JARs (mt + mp-mpi)
+        run: bash "$RUNNER_TEMP/gempba-src/scripts/build_all_jars_linux.sh"
+
+      # 6️⃣ Build and test every module against the installed gempba JARs
+      - name: Build gempba-java-examples
+        run: |
+          mvn -B verify \
+            -Dgempba.version="$GEMPBA_VERSION" \
+            -Dgempba.github.owner="$GEMPBA_OWNER"
