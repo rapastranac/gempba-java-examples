@@ -20,12 +20,11 @@ public class Main {
     private static final int ARG_SIZE = 256;
     private static final int CPUS_PER_TASK = 4;
     private static final int MAX_DEPTH = 24;
-    private static final double TIMEOUT = 3.0; // per-process search timeout (seconds)
     // --------------------
 
     static void main() {
 
-        Scheduler sched = GemPBA.createScheduler(SchedulerTopology.SEMI_CENTRALIZED, TIMEOUT);
+        Scheduler sched = GemPBA.createScheduler(SchedulerTopology.SEMI_CENTRALIZED);
         sched.setGoal(Goal.MAXIMISE, ScoreType.I32);
 
         int rank = sched.rankMe();
