@@ -31,8 +31,27 @@ public class Main {
 
         sched.barrier(); // synchronise before starting the search
 
-        if (rank == 0) {
-            // ── Center process ────────────────────────────────────────────────
+        LoadBalancer lb = GemPBA.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL, sched);
+        NodeManager nm = GemPBA.createNodeManager(lb, sched);
+
+        nm.setGoal(Goal.MAXIMISE, ScoreType.I32);
+        nm.setScore(Score.make(0));
+        if (!sched.isRoot()) {
+            nm.setThreadPoolSize(CPUS_PER_TASK);
+        }
+
+        Benchmark benchmark = new Benchmark(nm, lb);
+
+        SerialRunnable runnable = GemPBA.runnableReturnNone(
+                Benchmark.RUNNABLE_ID,
+                (tid, bytes) -> {
+                    Benchmark.Args a = Benchmark.DESERIALIZER.deserialize(bytes);
+                    benchmark.explore(tid, a.depth(), a.maxDepth(), new ArrayList<>(a.arg()), null);
+                    return null;
+                });
+
+        byte[] seed = null;
+        if (sched.isRoot()) {
             System.out.println("USING SEMI-CENTRALIZED STRATEGY");
             System.out.printf("Running synthetic-tree benchmark (MP):%n");
             System.out.printf("  Depth = %d (leaves = %d)%n", MAX_DEPTH, 1 << MAX_DEPTH);
@@ -42,33 +61,11 @@ public class Main {
                 initialArg.add((double) i);
             }
 
-            byte[] seedBytes = Benchmark.SERIALIZER.serialize(new Benchmark.Args(0, MAX_DEPTH, initialArg));
-
-            sched.center().run(seedBytes, Benchmark.RUNNABLE_ID);
-
-        } else {
-            // ── Worker process ────────────────────────────────────────────────
-            Scheduler.Worker workerView = sched.worker();
-            LoadBalancer lb = GemPBA.createLoadBalancer(BalancingPolicy.QUASI_HORIZONTAL, workerView);
-            NodeManager nm = GemPBA.createNodeManager(lb, workerView);
-
-            nm.setGoal(Goal.MAXIMISE, ScoreType.I32);
-            nm.setScore(Score.make(0));
-            nm.setThreadPoolSize(CPUS_PER_TASK);
-
-            Benchmark benchmark = new Benchmark(nm, lb);
-
-            SerialRunnable runnable = GemPBA.runnableReturnNone(
-                    Benchmark.RUNNABLE_ID,
-                    (tid, bytes) -> {
-                        Benchmark.Args a = Benchmark.DESERIALIZER.deserialize(bytes);
-                        benchmark.explore(tid, a.depth(), a.maxDepth(), new ArrayList<>(a.arg()), null);
-                        return null;
-                    });
-
-            workerView.run(nm, Map.of(Benchmark.RUNNABLE_ID, runnable));
-            runnable.close();
+            seed = Benchmark.SERIALIZER.serialize(new Benchmark.Args(0, MAX_DEPTH, initialArg));
         }
+
+        sched.run(nm, Map.of(Benchmark.RUNNABLE_ID, runnable), seed, Benchmark.RUNNABLE_ID);
+        runnable.close();
 
         sched.barrier(); // wait for all processes to finish
         sched.synchronizeStats();
