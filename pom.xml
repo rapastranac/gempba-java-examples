@@ -29,6 +29,7 @@
             Or set it once in a profile in ~/.m2/settings.xml.
         -->
         <gempba.github.owner>rapastranac</gempba.github.owner>
+        <gempba.version>4.4.0</gempba.version>
     </properties>
 
     <repositories>
