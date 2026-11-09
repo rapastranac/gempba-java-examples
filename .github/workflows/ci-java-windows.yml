@@ -1,0 +1,141 @@
+name: Java CI (Windows 2025)
+
+on:
+  push:
+    branches: [ "main" ]
+  # Docs-only PRs start no CI.
+  pull_request:
+    paths:
+      - '**'
+      - '!**/*.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-against-installed-gempba:
+    runs-on: ${{ fromJSON(vars.RUNNER_WINDOWS || '["windows-2025"]') }}
+    timeout-minutes: 45
+    env:
+      GEMPBA_OWNER: ${{ vars.GEMPBA_OWNER || github.repository_owner }}
+      GEMPBA_CROSS_REPO_TOKEN: ${{ secrets.GEMPBA_CROSS_REPO_TOKEN || '' }}
+
+    steps:
+      # 1️⃣ Checkout this repo
+      - name: Checkout gempba-java-examples
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      # 2️⃣ MSYS2 + dependencies. Both JAR variants build in this job, so msmpi
+      # is always installed (the mp-mpi native links it). cache: false and
+      # release: false reuse the preinstalled C:\msys64 on the self-hosted
+      # Server 2025 runner instead of doing a fresh install whose pacman-key
+      # wedges (gempba#159).
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          release: false
+          cache: false
+          update: true
+          install: >-
+            base-devel
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-make
+            mingw-w64-ucrt-x86_64-boost
+            mingw-w64-ucrt-x86_64-spdlog
+            mingw-w64-ucrt-x86_64-fmt
+            mingw-w64-ucrt-x86_64-hwloc
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-msmpi
+            git
+
+      - name: Install MS-MPI runtime
+        uses: mpi4py/setup-mpi@v1
+        with:
+          mpi: msmpi
+
+      # JAVA_HOME carries into the MSYS2 shell; gempba's build_jar_windows.sh
+      # finds Maven through the Windows registry PATH.
+      - name: Setup JDK 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Echo versions
+        shell: msys2 {0}
+        run: |
+          echo "g++: $(g++ --version | head -1 | awk '{print $NF}')"
+          echo "cmake: $(cmake --version | head -1 | awk '{print $3}')"
+          echo "java: $("$(cygpath -u "$JAVA_HOME")/bin/java" -version 2>&1 | head -1)"
+
+      # 3️⃣ Resolve sister-repo branch (same-name, fall back to main)
+      - name: Resolve gempba ref
+        id: gempba_ref
+        shell: msys2 {0}
+        run: |
+          # Override any extraheader/credential helper set by actions/checkout
+          # (v6 writes the GITHUB_TOKEN auth header to a separate config file
+          # that --local --unset-all cannot reach, so the URL-embedded PAT was
+          # being shadowed). -c clears them for THIS command only.
+          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
+            GEMPBA_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_OWNER}/gempba.git"
+          else
+            GEMPBA_URL="https://github.com/${GEMPBA_OWNER}/gempba.git"
+          fi
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          set +e
+          LS_OUTPUT=$(git -c http."https://github.com/".extraheader= -c credential.helper= ls-remote --exit-code --heads "$GEMPBA_URL" "$BRANCH" 2>&1)
+          LS_EXIT=$?
+          set -e
+          if [ "$LS_EXIT" = "0" ]; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+            echo "Picked sister branch '$BRANCH' from $GEMPBA_OWNER/gempba"
+          elif [ "$LS_EXIT" = "2" ]; then
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+            echo "Sister branch '$BRANCH' not present in $GEMPBA_OWNER/gempba; falling back to main"
+          else
+            echo "::error::ls-remote against $GEMPBA_OWNER/gempba failed (exit $LS_EXIT)"
+            echo "$LS_OUTPUT"
+            exit "$LS_EXIT"
+          fi
+
+      # 4️⃣ Clone gempba and record the JAR version its bindings/java/pom.xml builds
+      - name: Clone gempba
+        shell: msys2 {0}
+        run: |
+          if [ -n "$GEMPBA_CROSS_REPO_TOKEN" ]; then
+            GEMPBA_URL="https://x-access-token:${GEMPBA_CROSS_REPO_TOKEN}@github.com/${GEMPBA_OWNER}/gempba.git"
+          else
+            GEMPBA_URL="https://github.com/${GEMPBA_OWNER}/gempba.git"
+          fi
+          WS=$(cygpath -u "$GITHUB_WORKSPACE")
+          GEMPBA_SRC="$WS/.gempba-src"
+          git -c http."https://github.com/".extraheader= -c credential.helper= clone --depth 1 --branch "${{ steps.gempba_ref.outputs.ref }}" \
+            "$GEMPBA_URL" "$GEMPBA_SRC"
+          GEMPBA_VERSION=$(grep -m1 '<version>' "$GEMPBA_SRC/bindings/java/pom.xml" | sed -E 's/[[:space:]]*<version>([^<]+)<\/version>.*/\1/')
+          echo "GEMPBA_SRC=$GEMPBA_SRC" >> "$GITHUB_ENV"
+          echo "GEMPBA_VERSION=$GEMPBA_VERSION" >> "$GITHUB_ENV"
+          echo "gempba JAR version: $GEMPBA_VERSION"
+
+      # 5️⃣ Build the MT and MP gempba JARs and mvn install them into ~/.m2,
+      #    where this repo's io.gempba:gempba dependency resolves them.
+      - name: Install gempba JARs (mt + mp-mpi)
+        shell: msys2 {0}
+        run: bash "$GEMPBA_SRC/scripts/build_all_jars_windows.sh"
+
+      # 6️⃣ Build and test every module against the installed gempba JARs
+      - name: Build gempba-java-examples
+        shell: pwsh
+        run: |
+          mvn -B verify `
+            "-Dgempba.version=$env:GEMPBA_VERSION" `
+            "-Dgempba.github.owner=$env:GEMPBA_OWNER"
