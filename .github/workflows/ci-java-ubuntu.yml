@@ -47,7 +47,7 @@ jobs:
           echo "java: $(java -version 2>&1 | head -1)"
           echo "mvn: $(mvn -v | head -1)"
 
-      # 3️⃣ Resolve sister-repo branch (same-name, fall back to main)
+      # 3️⃣ Resolve sister-repo branch (same-name, then the PR's base, then main)
       - name: Resolve gempba ref
         id: gempba_ref
         run: |
@@ -60,22 +60,33 @@ jobs:
           else
             GEMPBA_URL="https://github.com/${GEMPBA_OWNER}/gempba.git"
           fi
+          # Same-name branch first, then the PR's base branch (an integration branch
+          # such as 414-…, whose gempba counterpart has the API this branch builds
+          # against), then main.
           BRANCH="${{ github.head_ref || github.ref_name }}"
-          set +e
-          LS_OUTPUT=$(git -c http."https://github.com/".extraheader= -c credential.helper= ls-remote --exit-code --heads "$GEMPBA_URL" "$BRANCH" 2>&1)
-          LS_EXIT=$?
-          set -e
-          if [ "$LS_EXIT" = "0" ]; then
-            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
-            echo "Picked sister branch '$BRANCH' from $GEMPBA_OWNER/gempba"
-          elif [ "$LS_EXIT" = "2" ]; then
-            echo "ref=main" >> "$GITHUB_OUTPUT"
-            echo "Sister branch '$BRANCH' not present in $GEMPBA_OWNER/gempba; falling back to main"
-          else
-            echo "::error::ls-remote against $GEMPBA_OWNER/gempba failed (exit $LS_EXIT)"
-            echo "$LS_OUTPUT"
-            exit "$LS_EXIT"
+          BASE="${{ github.base_ref }}"
+          CANDIDATES="$BRANCH"
+          if [ -n "$BASE" ] && [ "$BASE" != "$BRANCH" ]; then
+            CANDIDATES="$CANDIDATES $BASE"
           fi
+          REF=main
+          for CANDIDATE in $CANDIDATES; do
+            set +e
+            LS_OUTPUT=$(git -c http."https://github.com/".extraheader= -c credential.helper= ls-remote --exit-code --heads "$GEMPBA_URL" "$CANDIDATE" 2>&1)
+            LS_EXIT=$?
+            set -e
+            if [ "$LS_EXIT" = "0" ]; then
+              REF="$CANDIDATE"
+              break
+            elif [ "$LS_EXIT" != "2" ]; then
+              echo "::error::ls-remote against $GEMPBA_OWNER/gempba failed (exit $LS_EXIT)"
+              echo "$LS_OUTPUT"
+              exit "$LS_EXIT"
+            fi
+            echo "Branch '$CANDIDATE' not present in $GEMPBA_OWNER/gempba"
+          done
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "Picked branch '$REF' from $GEMPBA_OWNER/gempba"
 
       # 4️⃣ Clone gempba and record the JAR version its bindings/java/pom.xml builds
       - name: Clone gempba
@@ -102,3 +113,27 @@ jobs:
           mvn -B verify \
             -Dgempba.version="$GEMPBA_VERSION" \
             -Dgempba.github.owner="$GEMPBA_OWNER"
+
+      # 7️⃣ Open MPI's mpirun and runtime for the hybrid stress tests. The mp-mpi
+      #    native links Open MPI, which only the build container had so far.
+      - name: Install Open MPI runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openmpi-bin
+          echo "mpirun: $(mpirun --version | head -1)"
+
+      # 8️⃣ Stress-test multithreaded and hybrid runs, oversubscribed. Each run times out on its own after 60 s.
+      - name: Run the stress tests
+        timeout-minutes: 10
+        run: |
+          mvn -B verify -Pstress -Dgempba.stress.repeat=3 \
+            -Dgempba.version="$GEMPBA_VERSION" \
+            -Dgempba.github.owner="$GEMPBA_OWNER"
+
+      - name: Upload stress-test output
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: stress-logs-ubuntu
+          path: '*/target/stress-logs/*.log'
+          if-no-files-found: ignore
