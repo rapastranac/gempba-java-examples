@@ -84,6 +84,21 @@ Sub-package names follow `<problem>_<variant>`, lowercase with underscores — m
 
 Only the **synthetic-tree benchmark** — a generated binary tree with simulated per-node CPU cost, used to measure framework overhead end-to-end.
 
+## Stress tests
+
+The test sources hold two synthetic stress tests that need no input files. Each one walks a full binary tree and checks two answers that don't depend on how the work was split: the number of leaves (`2^depth`) and the best leaf (`2^depth - 1`). A run fails when either answer is wrong, or when it doesn't finish within 60 s.
+
+- `io.gempba.mt.stress.LeafVisitor`: one process on the quasi-horizontal load balancer, on 2, 8 and 16 threads.
+- `io.gempba.mp.stress.LeafVisitor`: MPI ranks with 2 threads each, on the semi-centralized scheduler and the quasi-horizontal load balancer, on 2, 4 and 8 ranks. The Java binding has no MPI reduce, so each rank prints its leaf count and the test adds them up.
+
+They oversubscribe small machines on purpose, so that hand-offs race. The hybrid runs need an MPI launcher on `PATH`: Open MPI's `mpirun` on Linux and macOS, where `--oversubscribe` is added for you, and MS-MPI's `mpiexec` on Windows. Override it with `-Dgempba.mpi.launcher=<launcher>` and `-Dgempba.mpi.args=<args>`.
+
+```sh
+mvn verify -Pstress
+```
+
+Add `-Dgempba.stress.repeat=20` for a longer soak. Each run's output lands in `<module>/target/stress-logs/`.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
