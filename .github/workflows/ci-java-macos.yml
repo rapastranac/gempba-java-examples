@@ -135,3 +135,19 @@ jobs:
           mvn -B verify \
             -Dgempba.version="$GEMPBA_VERSION" \
             -Dgempba.github.owner="$GEMPBA_OWNER"
+
+      # 7️⃣ Stress-test multithreaded and hybrid runs, oversubscribed. Each run times out on its own after 60 s.
+      - name: Run the stress tests
+        timeout-minutes: 10
+        run: |
+          mvn -B verify -Pstress -Dgempba.stress.repeat=3 \
+            -Dgempba.version="$GEMPBA_VERSION" \
+            -Dgempba.github.owner="$GEMPBA_OWNER"
+
+      - name: Upload stress-test output
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: stress-logs-macos
+          path: '*/target/stress-logs/*.log'
+          if-no-files-found: ignore
