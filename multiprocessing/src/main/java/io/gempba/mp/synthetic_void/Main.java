@@ -3,8 +3,9 @@ package io.gempba.mp.synthetic_void;
 import io.gempba.*;
 import io.gempba.core.LoadBalancer;
 import io.gempba.core.NodeManager;
+import io.gempba.mpi.Mpi;
+import io.gempba.mpi.SchedulerTopology;
 import io.gempba.scheduler.Scheduler;
-import io.gempba.scheduler.SchedulerTopology;
 import io.gempba.scheduler.SerialRunnable;
 import io.gempba.value.BalancingPolicy;
 import io.gempba.value.Goal;
@@ -24,7 +25,7 @@ public class Main {
 
     static void main() {
 
-        Scheduler sched = GemPBA.createScheduler(SchedulerTopology.SEMI_CENTRALIZED);
+        Scheduler sched = Mpi.createScheduler(SchedulerTopology.SEMI_CENTRALIZED);
         sched.setGoal(Goal.MAXIMISE, ScoreType.I32);
 
         int rank = sched.rankMe();
