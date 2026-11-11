@@ -15,35 +15,13 @@ Consumer-side examples for the Java bindings of [GemPBA](https://github.com/rapa
 
 Requires **Java 25** and **Maven 3.9+**.
 
-**One-time setup.** GitHub Packages requires authentication even for public artifacts. Create a GitHub Personal Access Token with the **`read:packages`** scope and add it to `~/.m2/settings.xml`:
-
-```xml
-<settings>
-    <servers>
-        <server>
-            <id>github-gempba</id>
-            <username>YOUR_GITHUB_USERNAME</username>
-            <password>YOUR_PAT</password>
-        </server>
-    </servers>
-</settings>
-```
-
-The `<id>` must match the repository id declared in the parent pom (`github-gempba`).
-
-Then:
+The examples depend on `io.github.rapastranac:gempba` and `gempba-mpi` from Maven Central, so there's nothing to configure:
 
 ```sh
 mvn install
 ```
 
-**Pointing at a different owner.** The pom resolves `io.gempba:gempba` from `rapastranac/gempba` by default. To resolve from a fork or org mirror, override the owner property — no pom edit needed:
-
-```sh
-mvn install -Dgempba.github.owner=my-org
-```
-
-Or set `gempba.github.owner` once in a profile in `~/.m2/settings.xml` to make it permanent for your checkout.
+**Against a local gempba checkout.** gempba's `scripts/build_all_jars_linux.sh` (or `_macos.sh`, `_windows.sh`) builds both JARs and installs them into `~/.m2` under the same coordinates, which is what this repo's CI does. Pass `-Dgempba.version=<version>` if it differs from the one in `pom.xml`.
 
 ## Run an example
 

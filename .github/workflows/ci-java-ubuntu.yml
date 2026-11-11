@@ -103,7 +103,8 @@ jobs:
           echo "gempba JAR version: $GEMPBA_VERSION"
 
       # 5️⃣ Build the MT and MP gempba JARs and mvn install them into ~/.m2,
-      #    where this repo's io.gempba:gempba dependency resolves them.
+      #    where this repo's io.github.rapastranac:gempba and gempba-mpi
+      #    dependencies resolve them.
       - name: Install gempba JARs (mt + mp-mpi)
         run: bash "$RUNNER_TEMP/gempba-src/scripts/build_all_jars_linux.sh"
 
@@ -111,8 +112,7 @@ jobs:
       - name: Build gempba-java-examples
         run: |
           mvn -B verify \
-            -Dgempba.version="$GEMPBA_VERSION" \
-            -Dgempba.github.owner="$GEMPBA_OWNER"
+            -Dgempba.version="$GEMPBA_VERSION"
 
       # 7️⃣ Open MPI's mpirun and runtime for the hybrid stress tests. The mp-mpi
       #    native links Open MPI, which only the build container had so far.
@@ -127,8 +127,7 @@ jobs:
         timeout-minutes: 10
         run: |
           mvn -B verify -Pstress -Dgempba.stress.repeat=3 \
-            -Dgempba.version="$GEMPBA_VERSION" \
-            -Dgempba.github.owner="$GEMPBA_OWNER"
+            -Dgempba.version="$GEMPBA_VERSION"
 
       - name: Upload stress-test output
         if: failure()

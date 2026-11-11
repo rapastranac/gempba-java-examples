@@ -24,10 +24,9 @@
             time (mpirun / mpiexec / MS-MPI).
         -->
         <dependency>
-            <groupId>io.gempba</groupId>
-            <artifactId>gempba</artifactId>
+            <groupId>io.github.rapastranac</groupId>
+            <artifactId>gempba-mpi</artifactId>
             <version>${gempba.version}</version>
-            <classifier>mp-mpi</classifier>
         </dependency>
 
         <!-- Shared benchmark helpers (busy-wait, jitter, …). -->

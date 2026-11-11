@@ -138,7 +138,8 @@ jobs:
           echo "gempba JAR version: $GEMPBA_VERSION"
 
       # 5️⃣ Build the MT and MP gempba JARs and mvn install them into ~/.m2,
-      #    where this repo's io.gempba:gempba dependency resolves them.
+      #    where this repo's io.github.rapastranac:gempba and gempba-mpi
+      #    dependencies resolve them.
       - name: Install gempba JARs (mt + mp-mpi)
         shell: msys2 {0}
         run: bash "$GEMPBA_SRC/scripts/build_all_jars_windows.sh"
@@ -148,8 +149,7 @@ jobs:
         shell: pwsh
         run: |
           mvn -B verify `
-            "-Dgempba.version=$env:GEMPBA_VERSION" `
-            "-Dgempba.github.owner=$env:GEMPBA_OWNER"
+            "-Dgempba.version=$env:GEMPBA_VERSION"
 
       # 7️⃣ Stress-test multithreaded and hybrid runs, oversubscribed. Each run times out on its own after 60 s.
       - name: Run the stress tests
@@ -157,8 +157,7 @@ jobs:
         timeout-minutes: 10
         run: |
           mvn -B verify -Pstress "-Dgempba.stress.repeat=3" `
-            "-Dgempba.version=$env:GEMPBA_VERSION" `
-            "-Dgempba.github.owner=$env:GEMPBA_OWNER"
+            "-Dgempba.version=$env:GEMPBA_VERSION"
 
       - name: Upload stress-test output
         if: failure()
