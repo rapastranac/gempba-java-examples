@@ -19,8 +19,8 @@ import java.util.Map;
 public class Main {
     // --- Configuration ---
     private static final int ARG_SIZE = 256;
-    private static final int CPUS_PER_TASK = 4;
-    private static final int MAX_DEPTH = 24;
+    private static final int CPUS_PER_TASK = Integer.getInteger("gempba.threads", 4);
+    private static final int MAX_DEPTH = Integer.getInteger("gempba.depth", 24);
     // --------------------
 
     static void main() {
