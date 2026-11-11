@@ -23,10 +23,9 @@
             MT-only build, so no MPI runtime is required on the host.
         -->
         <dependency>
-            <groupId>io.gempba</groupId>
+            <groupId>io.github.rapastranac</groupId>
             <artifactId>gempba</artifactId>
             <version>${gempba.version}</version>
-            <classifier>mt</classifier>
         </dependency>
 
         <!-- Shared benchmark helpers (busy-wait, jitter, …). -->
