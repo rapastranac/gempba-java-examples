@@ -46,6 +46,19 @@ mvn -pl sequential exec:java -Dexec.mainClass=io.gempba.seq.synthetic_void.Main
 mvn -pl mutithreading exec:java -Dexec.mainClass=io.gempba.mt.synthetic_void.Main
 ```
 
+## Run on a cluster
+
+`cluster/` builds `gempba-mpi` against a Slurm cluster's own MPI and runs `synthetic_void` across nodes, with no Docker. Check out gempba next to this repository, at the version you build against, then on a login node:
+
+```sh
+bash cluster/build.sh                  # gempba-mpi into ~/.m2, then the examples
+sbatch cluster/synthetic_void.sbatch   # after setting its --account
+```
+
+- `cluster/modules.sh` holds the modules both load, set for the Digital Research Alliance of Canada clusters; change it for another cluster.
+- The job runs 6 nodes x 2 ranks x 2 threads at depth 26, about 9 minutes on Rorqual. `-Dgempba.depth` and `-Dgempba.threads` size `synthetic_void`; each extra level doubles the work.
+- Its output goes to `report/` and `errors/`. Each rank logs `mca_pml_ucx_init` when Open MPI runs over UCX.
+
 ## Example layout
 
 Examples live as sibling sub-packages under `io.gempba.<module>`, one per variant:
