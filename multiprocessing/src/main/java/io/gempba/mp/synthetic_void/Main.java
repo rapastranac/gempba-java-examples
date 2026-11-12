@@ -21,9 +21,12 @@ public class Main {
     private static final int ARG_SIZE = 256;
     private static final int CPUS_PER_TASK = Integer.getInteger("gempba.threads", 4);
     private static final int MAX_DEPTH = Integer.getInteger("gempba.depth", 24);
+    private static final int TELEMETRY_PORT = Integer.getInteger("gempba.telemetry.port", 9000);
     // --------------------
 
     static void main() {
+
+        GemPBA.configureTelemetryPort(TELEMETRY_PORT);
 
         Scheduler sched = Mpi.createScheduler(SchedulerTopology.SEMI_CENTRALIZED);
         sched.setGoal(Goal.MAXIMISE, ScoreType.I32);
