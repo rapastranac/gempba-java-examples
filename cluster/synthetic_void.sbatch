@@ -23,6 +23,6 @@ export OMPI_MCA_pml_ucx_verbose=1
 cp="$SLURM_SUBMIT_DIR/multiprocessing/target/classes:$(cat "$SLURM_SUBMIT_DIR/cluster/classpath.txt")"
 
 echo "Starting run at: $(date)"
-srun java -Xmx3g -Dgempba.depth=26 -Dgempba.threads="$SLURM_CPUS_PER_TASK" -XX:-OmitStackTraceInFastThrow \
-    --enable-native-access=ALL-UNNAMED -cp "$cp" io.gempba.mp.synthetic_void.Main
+srun java -Xmx3g -Dgempba.depth=26 -Dgempba.threads="$SLURM_CPUS_PER_TASK" -Dgempba.telemetry.port=9000 \
+    -XX:-OmitStackTraceInFastThrow --enable-native-access=ALL-UNNAMED -cp "$cp" io.gempba.mp.synthetic_void.Main
 echo "Finishing run at: $(date)"

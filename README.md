@@ -57,6 +57,7 @@ sbatch cluster/synthetic_void.sbatch   # after setting its --account
 
 - `cluster/modules.sh` holds the modules both load, set for the Digital Research Alliance of Canada clusters; change it for another cluster.
 - The job runs 6 nodes x 2 ranks x 2 threads at depth 26, about 9 minutes on Rorqual. `-Dgempba.depth` and `-Dgempba.threads` size `synthetic_void`; each extra level doubles the work.
+- Rank 0 serves telemetry on port 9000, set with `-Dgempba.telemetry.port`. The C++ benchmark's job in gempba-examples serves on 9001, so the two jobs can share a node.
 - Its output goes to `report/` and `errors/`. Each rank logs `mca_pml_ucx_init` when Open MPI runs over UCX.
 
 ## Example layout
