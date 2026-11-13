@@ -37,7 +37,9 @@ The simplest path: open the project in **IntelliJ IDEA** (File → Open → pick
 ./multiprocessing/run.sh  synthetic_void -n 4   # Linux / macOS
 ```
 
-For one-click runs from IntelliJ, **right-click the script in the Project tree → Modify Run Configuration…**. IntelliJ creates the run config for you, pointing at the right interpreter; the only thing left is to fill in **Script options** with `<example> -n <ranks>`, where `<example>` is the sub-package name under `io.gempba.mp` (e.g. `synthetic_void`, not `synthetic`).
+Rank 0 serves telemetry on port 9000; `-port <n>` moves it, for example to run next to another gempba program on the same machine.
+
+For one-click runs from IntelliJ, **right-click the script in the Project tree → Modify Run Configuration…**. IntelliJ creates the run config for you, pointing at the right interpreter; the only thing left is to fill in **Script options** with `<example> -n <ranks>` (and `-port <n>` if needed), where `<example>` is the sub-package name under `io.gempba.mp` (e.g. `synthetic_void`, not `synthetic`).
 
 If you prefer the command line for MT / sequential:
 

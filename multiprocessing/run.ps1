@@ -4,6 +4,7 @@
 # Usage:
 #   .\run.ps1 synthetic_void                # default: 2 ranks
 #   .\run.ps1 synthetic_void -n 4           # 1 center + 3 workers
+#   .\run.ps1 synthetic_void -port 9001     # telemetry on port 9001 instead of 9000
 #
 # The positional argument is the sub-package name under io.gempba.mp —
 # e.g. `synthetic_void` → `io.gempba.mp.synthetic_void.Main`.
@@ -13,7 +14,8 @@
 
 param(
     [Parameter(Mandatory = $true, Position = 0)] [string] $example,
-    [int] $n = 2
+    [int] $n = 2,
+    [int] $port = 9000
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,6 +39,7 @@ $deps = (Get-Content $cpFile -Raw).Trim()
 $cp   = "$classes;$deps"  # ';' classpath separator on Windows
 
 mpiexec -n $n java `
+    "-Dgempba.telemetry.port=$port" `
     -XX:-OmitStackTraceInFastThrow `
     --enable-native-access=ALL-UNNAMED `
     -cp $cp `
