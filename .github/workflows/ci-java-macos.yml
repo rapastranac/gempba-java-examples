@@ -3,11 +3,13 @@ name: Java CI (macOS 26)
 on:
   push:
     branches: [ "main" ]
-  # Docs-only PRs start no CI.
+  # Hosted macOS minutes are scarce, so only PRs into main run it. Docs-only PRs start no CI.
   pull_request:
+    branches: [ "main" ]
     paths:
       - '**'
       - '!**/*.md'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,7 +20,7 @@ concurrency:
 
 jobs:
   build-against-installed-gempba:
-    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_INTEL || '["macos-26-intel"]') }}
+    runs-on: ${{ fromJSON(vars.RUNNER_MACOS_ARM64 || '["macos-26"]') }}
     timeout-minutes: 45
     env:
       GEMPBA_OWNER: ${{ vars.GEMPBA_OWNER || github.repository_owner }}
