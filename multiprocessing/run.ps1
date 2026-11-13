@@ -38,6 +38,8 @@ try {
 $deps = (Get-Content $cpFile -Raw).Trim()
 $cp   = "$classes;$deps"  # ';' classpath separator on Windows
 
+$env:GEMPBA_STOP_TOKEN = if ($env:GEMPBA_STOP_TOKEN) { $env:GEMPBA_STOP_TOKEN } else { 's3cret' }  # The token the dashboard's Stop asks for; $env:GEMPBA_STOP_TOKEN overrides it
+
 mpiexec -n $n java `
     "-Dgempba.telemetry.port=$port" `
     -XX:-OmitStackTraceInFastThrow `

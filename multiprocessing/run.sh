@@ -49,6 +49,8 @@ mainClass="io.gempba.mp.$example.Main"
 deps=$(cat "$cpFile")
 cp="$classes:$deps"  # ':' classpath separator on Linux/macOS
 
+export GEMPBA_STOP_TOKEN=${GEMPBA_STOP_TOKEN:-s3cret}  # The token the dashboard's Stop asks for; GEMPBA_STOP_TOKEN in the environment overrides it
+
 mpirun -n "$n" java \
     "-Dgempba.telemetry.port=$port" \
     -XX:-OmitStackTraceInFastThrow \
