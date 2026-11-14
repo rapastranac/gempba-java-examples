@@ -15,35 +15,13 @@ Consumer-side examples for the Java bindings of [GemPBA](https://github.com/rapa
 
 Requires **Java 25** and **Maven 3.9+**.
 
-**One-time setup.** GitHub Packages requires authentication even for public artifacts. Create a GitHub Personal Access Token with the **`read:packages`** scope and add it to `~/.m2/settings.xml`:
-
-```xml
-<settings>
-    <servers>
-        <server>
-            <id>github-gempba</id>
-            <username>YOUR_GITHUB_USERNAME</username>
-            <password>YOUR_PAT</password>
-        </server>
-    </servers>
-</settings>
-```
-
-The `<id>` must match the repository id declared in the parent pom (`github-gempba`).
-
-Then:
+The examples depend on `io.github.rapastranac:gempba` and `gempba-mpi` from Maven Central, so there's nothing to configure:
 
 ```sh
 mvn install
 ```
 
-**Pointing at a different owner.** The pom resolves `io.gempba:gempba` from `rapastranac/gempba` by default. To resolve from a fork or org mirror, override the owner property — no pom edit needed:
-
-```sh
-mvn install -Dgempba.github.owner=my-org
-```
-
-Or set `gempba.github.owner` once in a profile in `~/.m2/settings.xml` to make it permanent for your checkout.
+**Against a local gempba checkout.** gempba's `scripts/build_all_jars_linux.sh` (or `_macos.sh`, `_windows.sh`) builds both JARs and installs them into `~/.m2` under the same coordinates, which is what this repo's CI does. Pass `-Dgempba.version=<version>` if it differs from the one in `pom.xml`.
 
 ## Run an example
 
@@ -59,7 +37,11 @@ The simplest path: open the project in **IntelliJ IDEA** (File → Open → pick
 ./multiprocessing/run.sh  synthetic_void -n 4   # Linux / macOS
 ```
 
-For one-click runs from IntelliJ, **right-click the script in the Project tree → Modify Run Configuration…**. IntelliJ creates the run config for you, pointing at the right interpreter; the only thing left is to fill in **Script options** with `<example> -n <ranks>`, where `<example>` is the sub-package name under `io.gempba.mp` (e.g. `synthetic_void`, not `synthetic`).
+Rank 0 serves telemetry on port 9000; `-port <n>` moves it, for example to run next to another gempba program on the same machine.
+
+The launchers start every run with the stop token `s3cret`, the one the dashboard's **Stop the run** asks for. Type `s3cret` there, and the run stops and still reports its best result so far. To use your own token, set `GEMPBA_STOP_TOKEN` before running a launcher.
+
+For one-click runs from IntelliJ, **right-click the script in the Project tree → Modify Run Configuration…**. IntelliJ creates the run config for you, pointing at the right interpreter; the only thing left is to fill in **Script options** with `<example> -n <ranks>` (and `-port <n>` if needed), where `<example>` is the sub-package name under `io.gempba.mp` (e.g. `synthetic_void`, not `synthetic`).
 
 If you prefer the command line for MT / sequential:
 
@@ -67,6 +49,21 @@ If you prefer the command line for MT / sequential:
 mvn -pl sequential exec:java -Dexec.mainClass=io.gempba.seq.synthetic_void.Main
 mvn -pl mutithreading exec:java -Dexec.mainClass=io.gempba.mt.synthetic_void.Main
 ```
+
+## Run on a cluster
+
+`cluster/` builds `gempba-mpi` against a Slurm cluster's own MPI and runs `synthetic_void` across nodes, with no Docker. Check out gempba next to this repository, at the version you build against, then on a login node:
+
+```sh
+bash cluster/build.sh                  # gempba-mpi into ~/.m2, then the examples
+sbatch cluster/synthetic_void.sbatch   # after setting its --account
+```
+
+- `cluster/modules.sh` holds the modules both load, set for the Digital Research Alliance of Canada clusters; change it for another cluster.
+- The job runs 6 nodes x 2 ranks x 2 threads at depth 26, about 9 minutes on Rorqual. `-Dgempba.depth` and `-Dgempba.threads` size `synthetic_void`; each extra level doubles the work.
+- The job starts the run with the stop token `s3cret`, the one the dashboard's **Stop the run** asks for.
+- Rank 0 serves telemetry on port 9000, set with `-Dgempba.telemetry.port`. The C++ benchmark's job in gempba-examples serves on 9001, so the two jobs can share a node.
+- Its output goes to `report/` and `errors/`. Each rank logs `mca_pml_ucx_init` when Open MPI runs over UCX.
 
 ## Example layout
 
@@ -83,6 +80,21 @@ Sub-package names follow `<problem>_<variant>`, lowercase with underscores — m
 ## What's here today
 
 Only the **synthetic-tree benchmark** — a generated binary tree with simulated per-node CPU cost, used to measure framework overhead end-to-end.
+
+## Stress tests
+
+The test sources hold two synthetic stress tests that need no input files. Each one walks a full binary tree and checks two answers that don't depend on how the work was split: the number of leaves (`2^depth`) and the best leaf (`2^depth - 1`). A run fails when either answer is wrong, or when it doesn't finish within 60 s.
+
+- `io.gempba.mt.stress.LeafVisitor`: one process on the quasi-horizontal load balancer, on 2, 8 and 16 threads.
+- `io.gempba.mp.stress.LeafVisitor`: MPI ranks with 2 threads each, on the semi-centralized scheduler and the quasi-horizontal load balancer, on 2, 4 and 8 ranks. The Java binding has no MPI reduce, so each rank prints its leaf count and the test adds them up.
+
+They oversubscribe small machines on purpose, so that hand-offs race. The hybrid runs need an MPI launcher on `PATH`: Open MPI's `mpirun` on Linux and macOS, where `--oversubscribe` is added for you, and MS-MPI's `mpiexec` on Windows. Override it with `-Dgempba.mpi.launcher=<launcher>` and `-Dgempba.mpi.args=<args>`.
+
+```sh
+mvn verify -Pstress
+```
+
+Add `-Dgempba.stress.repeat=20` for a longer soak. Each run's output lands in `<module>/target/stress-logs/`.
 
 ## License
 

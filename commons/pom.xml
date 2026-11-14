@@ -18,4 +18,22 @@
         on itself.  No dependency on mutithreading / multiprocessing here.
     -->
 
+    <build>
+        <plugins>
+            <!-- Shares the stress-test harness in src/test with the other modules' stress tests. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.1</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>

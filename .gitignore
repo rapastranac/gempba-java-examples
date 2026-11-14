@@ -43,3 +43,8 @@ Thumbs.db
 ### Local overrides ###
 *.local
 *.local.*
+
+### Cluster runs ###
+cluster/classpath.txt
+report/
+errors/
