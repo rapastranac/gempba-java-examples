@@ -19,32 +19,10 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!--
-            GitHub owner that publishes the io.gempba:gempba artifact.  Defaults
-            to the canonical upstream so a fresh clone resolves against it.  Point
-            at a different owner (fork, org mirror) without touching this pom:
-
-              mvn install -Dgempba.github.owner=<owner>
-
-            Or set it once in a profile in ~/.m2/settings.xml.
-        -->
-        <gempba.github.owner>rapastranac</gempba.github.owner>
-        <gempba.version>4.4.0</gempba.version>
+        <gempba.version>5.0.0</gempba.version>
+        <!-- The stress tests run only under the stress profile, which clears this. -->
+        <gempba.excludedGroups>stress</gempba.excludedGroups>
     </properties>
-
-    <repositories>
-        <repository>
-            <id>github-gempba</id>
-            <name>GitHub Packages — ${gempba.github.owner}/gempba</name>
-            <url>https://maven.pkg.github.com/${gempba.github.owner}/gempba</url>
-            <releases>
-                <enabled>true</enabled>
-            </releases>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-        </repository>
-    </repositories>
 
     <dependencies>
         <dependency>
@@ -63,9 +41,59 @@
                 <version>3.2.5</version>
                 <configuration>
                     <argLine>--enable-native-access=ALL-UNNAMED</argLine>
+                    <excludedGroups>${gempba.excludedGroups}</excludedGroups>
                 </configuration>
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+            Synthetic stress tests: each run walks a full binary tree in its own process, checks the leaf count and
+            the best leaf, and fails after 60 s instead of hanging. Runs only the tests tagged stress:
+
+              mvn verify -Pstress
+              mvn verify -Pstress -Dgempba.stress.repeat=20    # longer soak
+
+            The hybrid runs need an MPI launcher on PATH: Open MPI's mpirun, oversubscribed, on Linux and macOS,
+            MS-MPI's mpiexec on Windows. Override with -Dgempba.mpi.launcher=... and -Dgempba.mpi.args=...
+        -->
+        <profile>
+            <id>stress</id>
+            <properties>
+                <gempba.excludedGroups />
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <groups>stress</groups>
+                        </configuration>
+                    </plugin>
+                    <!-- The child processes' classpath: this module's runtime dependencies. -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <version>3.6.1</version>
+                        <executions>
+                            <execution>
+                                <id>stress-classpath</id>
+                                <phase>generate-test-resources</phase>
+                                <goals>
+                                    <goal>build-classpath</goal>
+                                </goals>
+                                <configuration>
+                                    <includeScope>runtime</includeScope>
+                                    <outputFile>${project.build.directory}/stress-classpath.txt</outputFile>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

@@ -5,6 +5,7 @@
 # Usage:
 #   ./run.sh synthetic_void                 # default: 2 ranks
 #   ./run.sh synthetic_void -n 4            # 1 center + 3 workers
+#   ./run.sh synthetic_void -port 9001      # telemetry on port 9001 instead of 9000
 #
 # The positional argument is the sub-package name under io.gempba.mp —
 # e.g. `synthetic_void` → `io.gempba.mp.synthetic_void.Main`.
@@ -15,7 +16,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
-    echo "usage: $0 <example> [-n <ranks>]" >&2
+    echo "usage: $0 <example> [-n <ranks>] [-port <telemetry port>]" >&2
     exit 1
 fi
 
@@ -23,9 +24,11 @@ example=$1
 shift
 
 n=2
+port=9000
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -n) n=$2; shift 2 ;;
+        -port) port=$2; shift 2 ;;
         *)  echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -46,7 +49,10 @@ mainClass="io.gempba.mp.$example.Main"
 deps=$(cat "$cpFile")
 cp="$classes:$deps"  # ':' classpath separator on Linux/macOS
 
+export GEMPBA_STOP_TOKEN=${GEMPBA_STOP_TOKEN:-s3cret}  # The token the dashboard's Stop asks for; GEMPBA_STOP_TOKEN in the environment overrides it
+
 mpirun -n "$n" java \
+    "-Dgempba.telemetry.port=$port" \
     -XX:-OmitStackTraceInFastThrow \
     --enable-native-access=ALL-UNNAMED \
     -cp "$cp" \
