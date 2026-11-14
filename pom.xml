@@ -19,7 +19,7 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <gempba.version>4.4.0</gempba.version>
+        <gempba.version>5.0.0</gempba.version>
         <!-- The stress tests run only under the stress profile, which clears this. -->
         <gempba.excludedGroups>stress</gempba.excludedGroups>
     </properties>
